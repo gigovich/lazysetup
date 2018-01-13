@@ -1,3 +1,4 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/gigovich/lazysetup)](https://goreportcard.com/report/github.com/gigovich/lazysetup)
 # Lazy setup
 Golang lazy setup settings package. For most situations package constructors `func init()` are enought,
 but sometimes you can't do some steps in constructors, also this package can be alternative
@@ -110,3 +111,10 @@ func main() {
 	}
 }
 ```
+
+## Init order
+The `OnInit` function is defined as:
+`func OnInit(setupFunc func() error, name string, after ...string)`
+
+First argument is callback function which will be called only when all other callbacks listed in `after` arguments will be executed.
+Second argument is `name` of this initialization and can be used in `after` arguments list in other initializations.
