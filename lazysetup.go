@@ -2,6 +2,21 @@ package lazysetup
 
 import "fmt"
 
+// LazySettings configurator
+type LazySettings struct {
+	// onInits functions list
+	onInits map[string]*callback
+
+	// onClose functions list
+	onClose map[string]*callback
+
+	// alreadySetup flag
+	alreadySetup bool
+
+	// alreadyClosed flag
+	alreadyClosed bool
+}
+
 // Default setup object for project
 var Default = New()
 
@@ -10,53 +25,77 @@ func Init() error {
 	return Default.Init()
 }
 
-// OnInit without 'after' arguments appends setup function to setup chain functions ends. You can use 'after' args, to
-// be sure that this setup function will be called only after setup steps which names listed in 'after' arguments.
+// OnInit appends setupFunc function to list for lazy setup in default settings
 func OnInit(setupFunc func() error, name string, after ...string) {
 	Default.OnInit(setupFunc, name, after...)
 }
 
-// LazySetup configurator
-type LazySetup struct {
-	// onInits functions list
-	onInits map[string]*initCall
-
-	// alreadySetup flag
-	alreadySetup bool
+// OnClose appends closeFunc function to list of defer closers in default settings
+func OnClose(closeFunc func(), name string, after ...string) {
+	Default.OnClose(closeFunc, name, after...)
 }
 
-// New lazy setup instance constructor
-func New() *LazySetup {
-	return &LazySetup{
-		onInits: make(map[string]*initCall),
+// Close settings will call all registered close callbacks and don't return any error in default settings
+func Close() {
+	Default.Close()
+}
+
+// New instance constructor
+func New() *LazySettings {
+	return &LazySettings{
+		onInits: make(map[string]*callback),
+		onClose: make(map[string]*callback),
 	}
 }
 
-// OnInit without 'after' arguments appends setup function to setup chain functions ends. You can use 'after' args, to
-// be sure that this setup function will be called only after setup steps which names listed in 'after' arguments.
-func (s *LazySetup) OnInit(setupFunc func() error, name string, after ...string) {
-	s.onInits[name] = &initCall{name: name, setupFunc: setupFunc, after: after}
+// OnInit appends setupFunc function to list for lazy setup
+func (s *LazySettings) OnInit(setupFunc func() error, name string, after ...string) {
+	s.onInits[name] = &callback{name: name, hookFunc: setupFunc, after: after}
+}
+
+// OnClose appends closeFunc function to list of defer closers
+func (s *LazySettings) OnClose(closeFunc func(), name string, after ...string) {
+	s.onClose[name] = &callback{
+		name: name,
+		hookFunc: func() error {
+			closeFunc()
+			return nil
+		},
+		after: after,
+	}
 }
 
 // Init all settings options, safe for second call (it will be ignored)
-func (s *LazySetup) Init() error {
-	if s.alreadySetup {
+func (s *LazySettings) Init() error {
+	// don't ignore errors, we can't continue if something not initialized
+	return s.loopOverCallbacks(&s.alreadySetup, s.onInits)
+}
+
+// Close settings will call all registered close callbacks and don't return any error
+func (s *LazySettings) Close() {
+	// ignore errors, so last argument false
+	s.loopOverCallbacks(&s.alreadyClosed, s.onClose)
+}
+
+// loopOverCallbacks functions and call them
+func (s *LazySettings) loopOverCallbacks(flag *bool, cbList map[string]*callback) error {
+	if *flag {
 		return nil
 	}
 
-	// lazy call all setup handlers, but resolve them in dependency order
-	for key := range s.onInits {
-		if err := s.resolve(map[string]struct{}{}, s.onInits[key]); err != nil {
+	// lazy call all callbacks, but resolve them in dependency order
+	for key := range cbList {
+		if err := s.resolve(map[string]struct{}{}, cbList[key]); err != nil {
 			return err
 		}
 	}
 
-	s.alreadySetup = true
+	*flag = true
 	return nil
 }
 
 // resolve settings recurcive, path used to find cyclic dependecies
-func (s *LazySetup) resolve(path map[string]struct{}, ic *initCall) error {
+func (s *LazySettings) resolve(path map[string]struct{}, ic *callback) error {
 	if ic.resolved {
 		return nil
 	}
@@ -75,12 +114,12 @@ func (s *LazySetup) resolve(path map[string]struct{}, ic *initCall) error {
 		}
 	}
 	ic.resolved = true
-	return ic.setupFunc()
+	return ic.hookFunc()
 }
 
-type initCall struct {
-	name      string
-	after     []string
-	setupFunc func() error
-	resolved  bool
+type callback struct {
+	name     string
+	after    []string
+	hookFunc func() error
+	resolved bool
 }
