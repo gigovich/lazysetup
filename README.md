@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/gigovich/lazysetup.svg?branch=master)](https://travis-ci.org/gigovich/lazysetup)
+[![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/gigovich/lazysetup)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gigovich/lazysetup)](https://goreportcard.com/report/github.com/gigovich/lazysetup)
 # Lazy setup
 Golang lazy setup settings package. For most situations package constructors `func init()` are enought,
