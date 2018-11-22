@@ -103,7 +103,11 @@ func (s *LazySettings) resolve(path map[string]struct{}, ic *callback) error {
 
 	// recurcive resolve dependencies
 	for _, name := range ic.after {
-		dependency := s.onInits[name]
+		dependency, ok := s.onInits[name]
+		if !ok || dependency == nil {
+			return fmt.Errorf("no such 'after' dependency: '%v'", name)
+		}
+
 		if !dependency.resolved {
 			if _, ok := path[name]; ok {
 				return fmt.Errorf("'%v' has cyclic dependency '%v'", ic.name, name)
